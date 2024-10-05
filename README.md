@@ -13,7 +13,7 @@ conda install pytorch==1.7.0 torchvision==0.8.0 torchaudio==0.7.0 cudatoolkit=11
 pip install -r requirements.txt
 ```
 ## Generate Tusimple training set/validation set
-First, download tusimple dataset [here](https://github.com/TuSimple/tusimple-benchmark/issues/3).  
+First, download tusimple dataset [here](https://github.com/TuSimple/tusimple-benchmark/issues/3) through the kagge website.  
 
 path/to/your/unzipped/file should like this:  
 ```
