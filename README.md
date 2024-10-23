@@ -31,6 +31,10 @@ Then, run the following command to generate the training folder  and the train.t
 ```
 python tusimple_transform.py --src_dir ./TUSimple/train_set --val True
 ```
+or use torchrun
+```python
+torchrun --standalone --nproc_per_node=gpu train.py --dataset ./TUSimple/train_set/training --loss_type CrossEntropyLoss
+```
 
  
 

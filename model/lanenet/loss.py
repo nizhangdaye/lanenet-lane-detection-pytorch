@@ -9,8 +9,9 @@ from torch.autograd import Variable
 import torch
 import torch.nn as nn
 from torch.functional import F
+import os
 
-DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+DEVICE = int(os.environ['LOCAL_RANK'])
 
 class FocalLoss(nn.Module):
     '''
