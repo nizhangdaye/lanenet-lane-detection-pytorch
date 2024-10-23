@@ -42,10 +42,6 @@ Then, run the following command to generate the training folder and the train.tx
 ```
 python tusimple_transform.py --src_dir ./TUSimple/train_set --val True
 ```
-or use torchrun
-```python
-torchrun --standalone --nproc_per_node=gpu train.py --dataset ./TUSimple/train_set/training --loss_type CrossEntropyLoss
-```
 
 ## Training the model
 
@@ -90,10 +86,8 @@ The testing result is here:
 
 ## Evalution
 
-```python
-python
-eval.py - -dataset. / TUSimple / train_set / training - -model_type
-ENet - -model. / log / best_model.pth
+```
+python eval.py --dataset ./TUSimple/train_set/training --model_type ENet --model ./log/best_model.pth
 ```
 
 ## Reference:
