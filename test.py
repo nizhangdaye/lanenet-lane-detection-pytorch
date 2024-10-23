@@ -14,7 +14,7 @@ from PIL import Image
 import pandas as pd
 import cv2
 
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = int(os.environ['LOCAL_RANK'])
 
 def load_test_data(img_path, transform):
     img = Image.open(img_path)

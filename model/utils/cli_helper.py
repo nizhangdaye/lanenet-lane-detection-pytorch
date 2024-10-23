@@ -9,7 +9,7 @@ def parse_args():
     parser.add_argument("--epochs", required=False, type=int, help="Training epochs", default=25)
     parser.add_argument("--width", required=False, type=int, help="Resize width", default=512)
     parser.add_argument("--height", required=False, type=int, help="Resize height", default=256)
-    parser.add_argument("--bs", required=False, type=int, help="Batch size", default=4)
+    parser.add_argument("--bs", required=False, type=int, help="Batch size", default=32)
     parser.add_argument("--val", required=False, type=bool, help="Use validation", default=False)
     parser.add_argument("--lr", required=False, type=float, help="Learning rate", default=0.0001)
     parser.add_argument("--pretrained", required=False, default=None, help="pretrained model path")

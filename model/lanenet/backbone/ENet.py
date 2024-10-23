@@ -4,6 +4,7 @@ from torch.nn import init
 from torch import nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+import os
 
 '''
 ENet: A Deep Neural Network Architecture for Real-Time Semantic Segmentation
@@ -12,11 +13,12 @@ Refence: https://arxiv.org/pdf/1606.02147.pdf
 Code is written by Iroh Cao
 '''
 
-DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+DEVICE = int(os.environ['LOCAL_RANK'])
+
 
 def weights_init_kaiming(m):
     classname = m.__class__.__name__
-    #print(classname)
+    # print(classname)
     if classname.find('Conv') != -1:
         init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
     elif classname.find('Linear') != -1:
@@ -25,6 +27,7 @@ def weights_init_kaiming(m):
         init.normal_(m.weight.data, 1.0, 0.02)
         init.constant_(m.bias.data, 0.0)
 
+
 class InitialBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(InitialBlock, self).__init__()
@@ -32,19 +35,20 @@ class InitialBlock(nn.Module):
         self.conv_channel = out_ch - in_ch
 
         self.conv = nn.Sequential(
-            nn.Conv2d(in_ch, out_ch - in_ch, kernel_size = 3, stride = 2, padding=1),
+            nn.Conv2d(in_ch, out_ch - in_ch, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(out_ch - in_ch),
             nn.PReLU()
         )
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-    
+
     def forward(self, x):
         conv_branch = self.conv(x)
         maxp_branch = self.maxpool(x)
         return torch.cat([conv_branch, maxp_branch], 1)
 
+
 class BottleneckModule(nn.Module):
-    def __init__(self, in_ch, out_ch, module_type, padding = 1, dilated = 0, asymmetric = 5, dropout_prob = 0):
+    def __init__(self, in_ch, out_ch, module_type, padding=1, dilated=0, asymmetric=5, dropout_prob=0):
         super(BottleneckModule, self).__init__()
         self.input_channel = in_ch
         self.activate = nn.PReLU()
@@ -53,78 +57,78 @@ class BottleneckModule(nn.Module):
         if self.module_type == 'downsampling':
             self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
             self.conv = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, kernel_size = 2, stride = 2),
+                nn.Conv2d(in_ch, out_ch, kernel_size=2, stride=2),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 3, stride=1, padding=padding),
+                nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=padding),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(out_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
                 nn.Dropout2d(p=dropout_prob)
             )
         elif self.module_type == 'upsampling':
             self.maxunpool = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(in_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
-                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)    # Use upsample instead of maxunpooling
+                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)  # Use upsample instead of maxunpooling
             )
-            
+
             self.conv = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(in_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
                 nn.ConvTranspose2d(out_ch, out_ch, kernel_size=2, stride=2),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(out_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
                 nn.Dropout2d(p=dropout_prob)
             )
         elif self.module_type == 'regular':
             self.conv = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(in_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 3, stride=1, padding=padding),
+                nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=padding),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(out_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
                 nn.Dropout2d(p=dropout_prob)
             )
         elif self.module_type == 'asymmetric':
             self.conv = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(in_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
                 nn.Conv2d(out_ch, out_ch, (asymmetric, 1), stride=1, padding=(padding, 0)),
                 nn.Conv2d(out_ch, out_ch, (1, asymmetric), stride=1, padding=(0, padding)),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(out_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
                 nn.Dropout2d(p=dropout_prob)
             )
         elif self.module_type == 'dilated':
             self.conv = nn.Sequential(
-                nn.Conv2d(in_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(in_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 3, stride=1, padding=padding, dilation=dilated),
+                nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=padding, dilation=dilated),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
-                nn.Conv2d(out_ch, out_ch, kernel_size = 1),
+                nn.Conv2d(out_ch, out_ch, kernel_size=1),
                 nn.BatchNorm2d(out_ch),
                 nn.PReLU(),
                 nn.Dropout2d(p=dropout_prob)
             )
         else:
-            raise("Module Type error")
+            raise ("Module Type error")
 
     def forward(self, x):
         if self.module_type == 'downsampling':
@@ -142,11 +146,12 @@ class BottleneckModule(nn.Module):
             output = maxunp_branch + conv_branch
         else:
             output = self.conv(x) + x
-        
+
         return self.activate(output)
 
+
 class ENet_Encoder(nn.Module):
-    
+
     def __init__(self, in_ch=3, dropout_prob=0):
         super(ENet_Encoder, self).__init__()
 
@@ -154,37 +159,49 @@ class ENet_Encoder(nn.Module):
 
         self.initial_block = InitialBlock(in_ch, 16)
 
-        self.bottleneck1_0 = BottleneckModule(16, 64, module_type = 'downsampling', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck1_1 = BottleneckModule(64, 64, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck1_2 = BottleneckModule(64, 64, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck1_3 = BottleneckModule(64, 64, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck1_4 = BottleneckModule(64, 64, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
+        self.bottleneck1_0 = BottleneckModule(16, 64, module_type='downsampling', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck1_1 = BottleneckModule(64, 64, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck1_2 = BottleneckModule(64, 64, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck1_3 = BottleneckModule(64, 64, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck1_4 = BottleneckModule(64, 64, module_type='regular', padding=1, dropout_prob=dropout_prob)
 
-        self.bottleneck2_0 = BottleneckModule(64, 128, module_type = 'downsampling', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck2_1 = BottleneckModule(128, 128, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck2_2 = BottleneckModule(128, 128, module_type = 'dilated', padding = 2, dilated = 2, dropout_prob = dropout_prob)
-        self.bottleneck2_3 = BottleneckModule(128, 128, module_type = 'asymmetric', padding = 2, asymmetric=5, dropout_prob = dropout_prob)
-        self.bottleneck2_4 = BottleneckModule(128, 128, module_type = 'dilated', padding = 4, dilated = 4, dropout_prob = dropout_prob)
-        self.bottleneck2_5 = BottleneckModule(128, 128, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck2_6 = BottleneckModule(128, 128, module_type = 'dilated', padding = 8, dilated = 8, dropout_prob = dropout_prob)
-        self.bottleneck2_7 = BottleneckModule(128, 128, module_type = 'asymmetric', padding = 2, asymmetric=5, dropout_prob = dropout_prob)
-        self.bottleneck2_8 = BottleneckModule(128, 128, module_type = 'dilated', padding = 16, dilated = 16, dropout_prob = dropout_prob)
+        self.bottleneck2_0 = BottleneckModule(64, 128, module_type='downsampling', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck2_1 = BottleneckModule(128, 128, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck2_2 = BottleneckModule(128, 128, module_type='dilated', padding=2, dilated=2,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck2_3 = BottleneckModule(128, 128, module_type='asymmetric', padding=2, asymmetric=5,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck2_4 = BottleneckModule(128, 128, module_type='dilated', padding=4, dilated=4,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck2_5 = BottleneckModule(128, 128, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck2_6 = BottleneckModule(128, 128, module_type='dilated', padding=8, dilated=8,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck2_7 = BottleneckModule(128, 128, module_type='asymmetric', padding=2, asymmetric=5,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck2_8 = BottleneckModule(128, 128, module_type='dilated', padding=16, dilated=16,
+                                              dropout_prob=dropout_prob)
 
-        self.bottleneck3_0 = BottleneckModule(128, 128, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck3_1 = BottleneckModule(128, 128, module_type = 'dilated', padding = 2, dilated = 2, dropout_prob = dropout_prob)
-        self.bottleneck3_2 = BottleneckModule(128, 128, module_type = 'asymmetric', padding = 2, asymmetric=5, dropout_prob = dropout_prob)
-        self.bottleneck3_3 = BottleneckModule(128, 128, module_type = 'dilated', padding = 4, dilated = 4, dropout_prob = dropout_prob)
-        self.bottleneck3_4 = BottleneckModule(128, 128, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck3_5 = BottleneckModule(128, 128, module_type = 'dilated', padding = 8, dilated = 8, dropout_prob = dropout_prob)
-        self.bottleneck3_6 = BottleneckModule(128, 128, module_type = 'asymmetric', padding = 2, asymmetric=5, dropout_prob = dropout_prob)
-        self.bottleneck3_7 = BottleneckModule(128, 128, module_type = 'dilated', padding = 16, dilated = 16, dropout_prob = dropout_prob)
+        self.bottleneck3_0 = BottleneckModule(128, 128, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck3_1 = BottleneckModule(128, 128, module_type='dilated', padding=2, dilated=2,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck3_2 = BottleneckModule(128, 128, module_type='asymmetric', padding=2, asymmetric=5,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck3_3 = BottleneckModule(128, 128, module_type='dilated', padding=4, dilated=4,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck3_4 = BottleneckModule(128, 128, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck3_5 = BottleneckModule(128, 128, module_type='dilated', padding=8, dilated=8,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck3_6 = BottleneckModule(128, 128, module_type='asymmetric', padding=2, asymmetric=5,
+                                              dropout_prob=dropout_prob)
+        self.bottleneck3_7 = BottleneckModule(128, 128, module_type='dilated', padding=16, dilated=16,
+                                              dropout_prob=dropout_prob)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 weights_init_kaiming(m)
             elif isinstance(m, nn.BatchNorm2d):
                 weights_init_kaiming(m)
-    
+
     def forward(self, x):
         x = self.initial_block(x)
 
@@ -217,17 +234,16 @@ class ENet_Encoder(nn.Module):
 
 
 class ENet_Decoder(nn.Module):
-    
+
     def __init__(self, out_ch=1, dropout_prob=0):
         super(ENet_Decoder, self).__init__()
 
+        self.bottleneck4_0 = BottleneckModule(128, 64, module_type='upsampling', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck4_1 = BottleneckModule(64, 64, module_type='regular', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck4_2 = BottleneckModule(64, 64, module_type='regular', padding=1, dropout_prob=dropout_prob)
 
-        self.bottleneck4_0 = BottleneckModule(128, 64, module_type = 'upsampling', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck4_1 = BottleneckModule(64, 64, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck4_2 = BottleneckModule(64, 64, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
-
-        self.bottleneck5_0 = BottleneckModule(64, 16, module_type = 'upsampling', padding = 1, dropout_prob = dropout_prob)
-        self.bottleneck5_1 = BottleneckModule(16, 16, module_type = 'regular', padding = 1, dropout_prob = dropout_prob)
+        self.bottleneck5_0 = BottleneckModule(64, 16, module_type='upsampling', padding=1, dropout_prob=dropout_prob)
+        self.bottleneck5_1 = BottleneckModule(16, 16, module_type='regular', padding=1, dropout_prob=dropout_prob)
 
         self.fullconv = nn.ConvTranspose2d(16, out_ch, kernel_size=2, stride=2)
 
@@ -236,7 +252,7 @@ class ENet_Decoder(nn.Module):
                 weights_init_kaiming(m)
             elif isinstance(m, nn.BatchNorm2d):
                 weights_init_kaiming(m)
-    
+
     def forward(self, x):
 
         x = self.bottleneck4_0(x)
@@ -252,7 +268,7 @@ class ENet_Decoder(nn.Module):
 
 
 class ENet(nn.Module):
-    
+
     def __init__(self, in_ch=3, out_ch=1):
         super(ENet, self).__init__()
 
@@ -305,11 +321,10 @@ class ENet(nn.Module):
                 weights_init_kaiming(m)
             elif isinstance(m, nn.BatchNorm2d):
                 weights_init_kaiming(m)
-    
+
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
-
 
         # x = self.initial_block(x)
 
@@ -348,6 +363,7 @@ class ENet(nn.Module):
         # x = self.fullconv(x)
 
         return x
+
 
 #########################################################################
 '''

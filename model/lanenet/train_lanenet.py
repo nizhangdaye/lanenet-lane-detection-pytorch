@@ -19,7 +19,7 @@ def compute_loss(net_output, binary_label, instance_label, loss_type = 'FocalLos
     else:
         # print("Wrong loss type, will use the default CrossEntropyLoss")
         loss_fn = nn.CrossEntropyLoss()
-    
+
     binary_seg_logits = net_output["binary_seg_logits"]
     binary_loss = loss_fn(binary_seg_logits, binary_label)
 
@@ -47,6 +47,8 @@ def train_model(model, optimizer, scheduler, dataloaders, dataset_sizes, device,
         training_log['epoch'].append(epoch)
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
+
+        dataloaders['train'].sampler.set_epoch(epoch)
 
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:

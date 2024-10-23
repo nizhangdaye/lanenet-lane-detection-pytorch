@@ -19,7 +19,7 @@ from PIL import Image
 import pandas as pd
 import cv2
 
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = int(os.environ['LOCAL_RANK'])
 
 def evaluation():
     args = parse_args()
